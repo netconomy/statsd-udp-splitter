@@ -1,0 +1,8 @@
+
+build with
+go get
+go build
+
+
+on OSX set your gopath ->
+export GOPATH=/tmp/ or something like that
