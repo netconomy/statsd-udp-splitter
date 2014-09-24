@@ -2,13 +2,39 @@ package main
 
 import (
 	"fmt"
-	"net"
-	"strconv"
-	//  collectd "github.com/paulhammond/gocollectd"
 	goopt "github.com/droundy/goopt"
+	// "github.com/mattbaird/elastigo"
+	"encoding/json"
+	"io/ioutil"
+	"log"
+	"net"
+	"os"
+	"strconv"
 )
 
-var port = goopt.Int([]string{"-p", "--port"}, 8126, "UDP Port to use")
+var port = goopt.Int([]string{"-p", "--port"}, 8125, "UDP Port to use")
+var config = goopt.String([]string{"-c", "--config"}, "./config.json", "Configuration file to use")
+
+func readConfig(filepath string) (map[string]interface{}, error) {
+	file, e := ioutil.ReadFile(filepath)
+	if e != nil {
+		return nil, e
+	}
+	var cfg map[string]interface{}
+	if e = json.Unmarshal(file, &cfg); e != nil {
+		return nil, e
+	}
+	return cfg, nil
+}
+
+func getAddressFromConfig(serverType string, cfg map[string]interface{}) (net.UDPAddr, error) {
+	key := cfg[serverType].(map[string]interface{})
+	parsedIp, _, e := net.ParseCIDR(key["ip"].(string))
+	if e != nil {
+		return net.UDPAddr{}, e
+	}
+	return net.UDPAddr{IP: parsedIp, Port: int(key["port"].(float64))}, e
+}
 
 func main() {
 	goopt.Description = func() string {
@@ -18,19 +44,46 @@ func main() {
 	goopt.Summary = "gostats"
 	goopt.Parse(nil)
 
-	addr, _ := net.ResolveUDPAddr("udp", ":"+strconv.Itoa(*port))
-	sock, _ := net.ListenUDP("udp", addr)
+	readConf, err := readConfig(*config)
 
-	i := 0
+	if err != nil {
+		fmt.Printf("Failed to parse configuration file: %v\n", err)
+		os.Exit(1)
+	}
+
+	cfg := readConf["config"].(map[string]interface{})
+
+	elasticsearch, err := getAddressFromConfig("elasticsearch", cfg)
+	if err != nil {
+		fmt.Printf("Failed to get Server address for Elasticsearch: %v\n", err)
+		os.Exit(0)
+	}
+
+	graphite, err := getAddressFromConfig("graphite", cfg)
+	if err != nil {
+		fmt.Printf("Failed to get Server address for Graphite: %v\n", err)
+		os.Exit(0)
+	}
+
+	fmt.Println(elasticsearch)
+	fmt.Println(graphite)
+
+	addr, _ := net.ResolveUDPAddr("udp", ":"+strconv.Itoa(*port))
+	fmt.Println(addr)
+	conn, err := net.ListenUDP("udp", addr)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer conn.Close()
 	for {
-		i++
-		buf := make([]byte, 1024)
-		rlen, _, err := sock.ReadFromUDP(buf)
-		if err != nil {
-			fmt.Println(err)
+		message := make([]byte, 512)
+		n, _, err := conn.ReadFromUDP(message)
+		log.Printf("Got %d bytes\n", n)
+		log.Printf("Data: %s", message)
+		if err != nil || n == 0 {
+			log.Printf("Error is: %s, bytes are: %d", err, n)
+			continue
 		}
-		fmt.Println(string(buf[0:rlen]))
-		fmt.Println(i)
-		//go handlePacket(buf, rlen)
 	}
 }

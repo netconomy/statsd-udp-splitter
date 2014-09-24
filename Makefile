@@ -1,5 +1,6 @@
 DEPENDENCIES := github.com/droundy/goopt \
-				github.com/stretchr/testify
+				github.com/stretchr/testify \
+				github.com/mattbaird/elastigo 
 
 all: build test
 
