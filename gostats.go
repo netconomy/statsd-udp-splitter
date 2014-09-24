@@ -45,8 +45,10 @@ func getTCPAddressFromConfig(serverType string, cfg map[string]interface{}) (net
 	return net.TCPAddr{IP: parsedIp, Port: int(key["port"].(float64))}, e
 }
 
-func sendToGraphite(message []byte, graphite net.UDPAddr) {
-
+func sendToGraphite(message []byte, conn net.UDPConn, graphite net.UDPAddr) {
+	if message != nil && len(message) > 0 {
+		conn.WriteToUDP([]byte(fmt.Sprintf("%s|g", string(message))), &graphite)
+	}
 }
 
 func main() {
@@ -78,6 +80,12 @@ func main() {
 		os.Exit(0)
 	}
 
+	graphiteConn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
+	if err != nil {
+		fmt.Printf("Failed to create UDP Connection: %v\n", err)
+		os.Exit(0)
+	}
+
 	fmt.Println(elasticsearch)
 	fmt.Println(graphite)
 
@@ -100,6 +108,6 @@ func main() {
 			log.Printf("Error is: %s, bytes are: %d", err, n)
 			continue
 		}
-		sendToGraphite(message, graphite)
+		sendToGraphite(message, *graphiteConn, graphite)
 	}
 }
