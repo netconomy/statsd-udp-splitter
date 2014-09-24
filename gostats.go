@@ -1,16 +1,25 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	goopt "github.com/droundy/goopt"
-	// "github.com/mattbaird/elastigo"
-	"encoding/json"
+	"github.com/packetbeat/elastigo/api"
+	"github.com/packetbeat/elastigo/core"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"strconv"
+	"strings"
 )
+
+type UDPData struct {
+	prefix  string
+	project string `json: "project"`
+	metric  string `json: "metric"`
+	value   string `json: "value"`
+}
 
 var port = goopt.Int([]string{"-p", "--port"}, 8125, "UDP Port to use")
 var config = goopt.String([]string{"-c", "--config"}, "./config.json", "Configuration file to use")
@@ -51,6 +60,17 @@ func sendToGraphite(message []byte, conn net.UDPConn, graphite net.UDPAddr) {
 	}
 }
 
+func sendToElasticsearch(message []byte) {
+	data := createDataStruct(message)
+	core.Index(data.prefix, "metric", "1", nil, data)
+}
+
+func createDataStruct(message []byte) UDPData {
+	valueSplit := strings.Split(string(message), ":")
+	keySplit := strings.Split(valueSplit[0], ".")
+	return UDPData{project: keySplit[2], prefix: keySplit[0] + "." + keySplit[1], metric: keySplit[3], value: valueSplit[1]}
+}
+
 func main() {
 	goopt.Description = func() string {
 		return "Metric Wrapper for (at first) graphite & elasticsearch."
@@ -73,6 +93,9 @@ func main() {
 		fmt.Printf("Failed to get Server address for Elasticsearch: %v\n", err)
 		os.Exit(0)
 	}
+
+	api.Domain = string(elasticsearch.IP)
+	api.Port = strconv.Itoa(elasticsearch.Port)
 
 	graphite, err := getUDPAddressFromConfig("graphite", cfg)
 	if err != nil {
@@ -109,5 +132,6 @@ func main() {
 			continue
 		}
 		sendToGraphite(message, *graphiteConn, graphite)
+		sendToElasticsearch(message)
 	}
 }
