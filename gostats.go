@@ -27,13 +27,26 @@ func readConfig(filepath string) (map[string]interface{}, error) {
 	return cfg, nil
 }
 
-func getAddressFromConfig(serverType string, cfg map[string]interface{}) (net.UDPAddr, error) {
+func getUDPAddressFromConfig(serverType string, cfg map[string]interface{}) (net.UDPAddr, error) {
 	key := cfg[serverType].(map[string]interface{})
 	parsedIp, _, e := net.ParseCIDR(key["ip"].(string))
 	if e != nil {
 		return net.UDPAddr{}, e
 	}
 	return net.UDPAddr{IP: parsedIp, Port: int(key["port"].(float64))}, e
+}
+
+func getTCPAddressFromConfig(serverType string, cfg map[string]interface{}) (net.TCPAddr, error) {
+	key := cfg[serverType].(map[string]interface{})
+	parsedIp, _, e := net.ParseCIDR(key["ip"].(string))
+	if e != nil {
+		return net.TCPAddr{}, e
+	}
+	return net.TCPAddr{IP: parsedIp, Port: int(key["port"].(float64))}, e
+}
+
+func sendToGraphite(message []byte, graphite net.UDPAddr) {
+
 }
 
 func main() {
@@ -53,13 +66,13 @@ func main() {
 
 	cfg := readConf["config"].(map[string]interface{})
 
-	elasticsearch, err := getAddressFromConfig("elasticsearch", cfg)
+	elasticsearch, err := getTCPAddressFromConfig("elasticsearch", cfg)
 	if err != nil {
 		fmt.Printf("Failed to get Server address for Elasticsearch: %v\n", err)
 		os.Exit(0)
 	}
 
-	graphite, err := getAddressFromConfig("graphite", cfg)
+	graphite, err := getUDPAddressFromConfig("graphite", cfg)
 	if err != nil {
 		fmt.Printf("Failed to get Server address for Graphite: %v\n", err)
 		os.Exit(0)
@@ -71,11 +84,13 @@ func main() {
 	addr, _ := net.ResolveUDPAddr("udp", ":"+strconv.Itoa(*port))
 	fmt.Println(addr)
 	conn, err := net.ListenUDP("udp", addr)
+
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
 	defer conn.Close()
+
 	for {
 		message := make([]byte, 512)
 		n, _, err := conn.ReadFromUDP(message)
@@ -85,5 +100,6 @@ func main() {
 			log.Printf("Error is: %s, bytes are: %d", err, n)
 			continue
 		}
+		sendToGraphite(message, graphite)
 	}
 }
