@@ -3,9 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/belogik/goes"
 	goopt "github.com/droundy/goopt"
-	"github.com/packetbeat/elastigo/api"
-	"github.com/packetbeat/elastigo/core"
 	"io/ioutil"
 	"log"
 	"net"
@@ -15,7 +14,7 @@ import (
 )
 
 type UDPData struct {
-	prefix  string
+	prefix  string `json: "prefix"`
 	project string `json: "project"`
 	metric  string `json: "metric"`
 	value   string `json: "value"`
@@ -45,13 +44,10 @@ func getUDPAddressFromConfig(serverType string, cfg map[string]interface{}) (net
 	return net.UDPAddr{IP: parsedIp, Port: int(key["port"].(float64))}, e
 }
 
-func getTCPAddressFromConfig(serverType string, cfg map[string]interface{}) (net.TCPAddr, error) {
+func getElasticSearchConnection(serverType string, cfg map[string]interface{}) (conn *goes.Connection) {
 	key := cfg[serverType].(map[string]interface{})
-	parsedIp, _, e := net.ParseCIDR(key["ip"].(string))
-	if e != nil {
-		return net.TCPAddr{}, e
-	}
-	return net.TCPAddr{IP: parsedIp, Port: int(key["port"].(float64))}, e
+	conn = goes.NewConnection(key["hostname"].(string), strconv.FormatFloat(key["port"].(float64), 'f', -1, 64))
+	return
 }
 
 func sendToGraphite(message []byte, conn net.UDPConn, graphite net.UDPAddr) {
@@ -60,9 +56,18 @@ func sendToGraphite(message []byte, conn net.UDPConn, graphite net.UDPAddr) {
 	}
 }
 
-func sendToElasticsearch(message []byte) {
+func sendToElasticsearch(message []byte, conn goes.Connection) {
 	data := createDataStruct(message)
-	core.Index(data.prefix, "metric", "1", nil, data)
+	jsonData := map[string]interface{}{
+		"metric": data.metric,
+		"value":  strings.Trim(data.value, "\u0000"),
+	}
+	doc := goes.Document{
+		Index:  "sonar",
+		Type:   "metric",
+		Fields: jsonData,
+	}
+	conn.Index(doc, nil)
 }
 
 func createDataStruct(message []byte) UDPData {
@@ -88,14 +93,7 @@ func main() {
 
 	cfg := readConf["config"].(map[string]interface{})
 
-	elasticsearch, err := getTCPAddressFromConfig("elasticsearch", cfg)
-	if err != nil {
-		fmt.Printf("Failed to get Server address for Elasticsearch: %v\n", err)
-		os.Exit(0)
-	}
-
-	api.Domain = string(elasticsearch.IP)
-	api.Port = strconv.Itoa(elasticsearch.Port)
+	elasticConn := getElasticSearchConnection("elasticsearch", cfg)
 
 	graphite, err := getUDPAddressFromConfig("graphite", cfg)
 	if err != nil {
@@ -109,7 +107,6 @@ func main() {
 		os.Exit(0)
 	}
 
-	fmt.Println(elasticsearch)
 	fmt.Println(graphite)
 
 	addr, _ := net.ResolveUDPAddr("udp", ":"+strconv.Itoa(*port))
@@ -132,6 +129,6 @@ func main() {
 			continue
 		}
 		sendToGraphite(message, *graphiteConn, graphite)
-		sendToElasticsearch(message)
+		sendToElasticsearch(message, *elasticConn)
 	}
 }

@@ -5,8 +5,8 @@
             "port": 8125
         },
         "elasticsearch": {
-            "ip": "127.0.0.1/24",
-            "port": 1337
+            "hostname": "stats.p.local.netconomy.net",
+            "port": 9200
         }
     }
 }
