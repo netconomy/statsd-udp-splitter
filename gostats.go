@@ -52,7 +52,10 @@ func getElasticSearchConnection(serverType string, cfg map[string]interface{}) (
 
 func sendToGraphite(message []byte, conn net.UDPConn, graphite net.UDPAddr) {
 	if message != nil && len(message) > 0 {
-		conn.WriteToUDP([]byte(fmt.Sprintf("%s|g", string(message))), &graphite)
+		_, err := conn.WriteToUDP([]byte(fmt.Sprintf("%s|g", string(message))), &graphite)
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 }
 
@@ -67,7 +70,10 @@ func sendToElasticsearch(message []byte, conn goes.Connection) {
 		Type:   "metric",
 		Fields: jsonData,
 	}
-	conn.Index(doc, nil)
+	_, err := conn.Index(doc, nil)
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
 func createDataStruct(message []byte) UDPData {
