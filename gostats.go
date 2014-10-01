@@ -55,7 +55,8 @@ func sendToGraphite(message []byte, conn net.UDPConn, graphite net.UDPAddr) {
 		msg := string(message)
 		valueSplitIndex := strings.LastIndex(msg, ":")
 		formattedString := strings.Replace(msg[0:valueSplitIndex], ":", "_", -1) + msg[valueSplitIndex:len(msg)]
-		_, err := conn.WriteToUDP([]byte(fmt.Sprintf("%s|g", formattedString)), &graphite)
+		conc := fmt.Sprintf("%s|g", strings.Trim(formattedString, "\u0000"))
+		_, err := conn.WriteToUDP([]byte(conc), &graphite)
 		if err != nil {
 			fmt.Println(err)
 		}
