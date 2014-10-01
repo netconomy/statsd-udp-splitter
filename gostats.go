@@ -52,7 +52,10 @@ func getElasticSearchConnection(serverType string, cfg map[string]interface{}) (
 
 func sendToGraphite(message []byte, conn net.UDPConn, graphite net.UDPAddr) {
 	if message != nil && len(message) > 0 {
-		_, err := conn.WriteToUDP([]byte(fmt.Sprintf("%s|g", string(message))), &graphite)
+		msg := string(message)
+		valueSplitIndex := strings.LastIndex(msg, ":")
+		formattedString := strings.Replace(msg[0:valueSplitIndex], ":", "_", -1) + msg[valueSplitIndex:len(msg)]
+		_, err := conn.WriteToUDP([]byte(fmt.Sprintf("%s|g", formattedString)), &graphite)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -77,9 +80,11 @@ func sendToElasticsearch(message []byte, conn goes.Connection) {
 }
 
 func createDataStruct(message []byte) UDPData {
-	valueSplit := strings.Split(string(message), ":")
-	keySplit := strings.Split(valueSplit[0], ".")
-	return UDPData{project: keySplit[2], prefix: keySplit[0] + "." + keySplit[1], metric: keySplit[3], value: valueSplit[1]}
+	msg := string(message)
+	valueSplitIndex := strings.LastIndex(msg, ":")
+	valueSplit := msg[valueSplitIndex+1 : len((msg))]
+	keySplit := strings.Split(strings.Replace(msg[0:valueSplitIndex], ":", "_", -1), ".")
+	return UDPData{project: keySplit[2], prefix: keySplit[0] + "." + keySplit[1], metric: keySplit[3], value: valueSplit}
 }
 
 func main() {
