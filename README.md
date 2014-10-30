@@ -16,4 +16,4 @@ Configuration:
 * graphite instance
 
 #RUN
-./gostats -p 1234
+./statsd-udp-splitter -p 1234

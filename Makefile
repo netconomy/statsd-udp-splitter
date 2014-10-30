@@ -5,7 +5,7 @@ DEPENDENCIES := github.com/droundy/goopt \
 all: build test
 
 build:
-		go build gostats.go 
+		go build main.go 
 
 test:
 		go test -v $(PACKAGES)
