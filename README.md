@@ -1,5 +1,5 @@
-#UDP Stats Splitter
-A proxy server written in Go for broadcasting statsd-UDP-packets to a Graphite and Elasticsearch instance.
+#statsd-udp-splitter
+A proxy server written in Go for broadcasting UDP-packets using the statsd protocol to a Graphite and Elasticsearch instance.
 
 #BUILD IT
 make deps
