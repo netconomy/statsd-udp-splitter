@@ -1,19 +1,19 @@
 #statsd-udp-splitter
 A proxy server written in Go for broadcasting UDP-packets using the statsd protocol to a Graphite and Elasticsearch instance.
 
-#BUILD IT
+#BUILD
 make deps
 make
 
-#TEST IT
+#TEST
 make test
 
-#CONFIG IT
+#CONFIG
 Use ./config.json or provide another configuration file.
 
 Configuration:
 * elasticsearch instance
 * graphite instance
 
-#RUN IT
+#RUN
 ./gostats -p 1234
